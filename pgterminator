@@ -1,0 +1,72 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+
+use DBI;
+use DBD::Pg;
+use Time::HiRes qw(time sleep);
+use Data::Dumper;
+use DateTime;
+
+$| = 1;
+
+my @Connect      = ("dbi:Pg:", '', '', {pg_enable_utf8 => 1, sslmode => 'require', RaiseError => 1, PrintError => 0, AutoCommit => 1});
+
+my $DatabaseHandle = DBI->connect(@Connect) or die "Unable to connect";
+
+# CONFIG:
+# terminator.Sacrifice() will be called if at least $LimitMaxWaitingPIDs PIDs
+# have been waiting AND if the PID that has been waiting the longest
+# has been waiting for at least $LimitMaxLongestWaitingSeconds seconds.
+my $LimitMaxLongestWaitingSeconds = 5;
+my $LimitMaxWaitingPIDs           = 3;
+
+sub tprint {
+    my $msg = shift;
+    print DateTime->now(time_zone => 'local')->datetime() . ' ' . $msg . "\n";
+}
+
+my $Sacrifice    = $DatabaseHandle->prepare('SELECT terminator.Sacrifice(_BlockingPID := $1, _WaitingPID := $2)');
+my $Waiting_PIDs = $DatabaseHandle->prepare('SELECT ProtectedWaitingPIDs, UnprotectedOldestRunningPID FROM terminator.Waiting_PIDs()');
+
+unless ($DatabaseHandle->{pg_user} eq 'pgterminator') {
+    die "Not connected as the 'pgterminator' database user!";
+}
+
+tprint("PgTerminator is now running");
+
+my $WaitingPIDs = {};
+for (;;) {
+    $Waiting_PIDs->execute();
+    my ($ProtectedWaitingPIDs, $UnprotectedOldestRunningPID) = $Waiting_PIDs->fetchrow_array();
+    if (!defined($ProtectedWaitingPIDs)) {
+        sleep(1);
+        next;
+    }
+    foreach my $PID (keys %{$WaitingPIDs}) {
+        unless (grep {$_ eq $PID} @$ProtectedWaitingPIDs) {
+            # Not waiting anymore so delete PID
+            delete $WaitingPIDs->{$PID};
+        }
+    }
+    my $WaitingMaxSeconds = 0;
+    my $WaitingMaxPID;
+    foreach my $PID (@$ProtectedWaitingPIDs) {
+        $WaitingPIDs->{$PID} += 1; # count seconds it has been waiting
+        if ($WaitingPIDs->{$PID} > $WaitingMaxSeconds) {
+            $WaitingMaxSeconds = $WaitingPIDs->{$PID};
+            $WaitingMaxPID     = $PID;
+        }
+    }
+    my $NumWaitingPIDs = scalar keys %$WaitingPIDs;
+    if ($NumWaitingPIDs > 0) {
+        tprint("$NumWaitingPIDs waiting PIDs, longest has waited $WaitingMaxSeconds seconds");
+    }
+    if ($NumWaitingPIDs >= $LimitMaxWaitingPIDs) {
+        if ($WaitingMaxSeconds >= $LimitMaxLongestWaitingSeconds) {
+            $Sacrifice->execute($UnprotectedOldestRunningPID, $WaitingMaxPID);
+            $WaitingPIDs = {};
+        }
+    }
+    sleep(1);
+}
