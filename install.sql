@@ -16,6 +16,7 @@ CREATE SCHEMA terminator;
 \ir FUNCTIONS/pg_stat_activity_portable.sql
 \ir FUNCTIONS/waiting_pids.sql
 \ir FUNCTIONS/sacrifice.sql
+\ir FUNCTIONS/is_protected.sql
 GRANT USAGE ON SCHEMA terminator TO pgterminator;
 
 COMMIT;

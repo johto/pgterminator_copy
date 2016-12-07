@@ -62,11 +62,9 @@ for (;;) {
     if ($NumWaitingPIDs > 0) {
         tprint("$NumWaitingPIDs waiting PIDs, longest has waited $WaitingMaxSeconds seconds");
     }
-    if ($NumWaitingPIDs >= $LimitMaxWaitingPIDs) {
-        if ($WaitingMaxSeconds >= $LimitMaxLongestWaitingSeconds) {
-            $Sacrifice->execute($UnprotectedOldestRunningPID, $WaitingMaxPID);
-            $WaitingPIDs = {};
-        }
+    if ($NumWaitingPIDs >= $LimitMaxWaitingPIDs && $WaitingMaxSeconds >= $LimitMaxLongestWaitingSeconds) {
+        $Sacrifice->execute($UnprotectedOldestRunningPID, $WaitingMaxPID);
+        $WaitingPIDs = {};
     }
     sleep(1);
 }

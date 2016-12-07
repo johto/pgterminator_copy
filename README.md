@@ -96,6 +96,13 @@ To allow sacrificing the less important user "bar":
 INSERT INTO terminator.Users (Username, Protected) VALUES ('bar', FALSE);
 ```
 
+To allow sacrificing the less important user "baz" but only if pg_stat_activity.application_name is "mycronjob":
+```
+INSERT INTO terminator.Users (Username, ApplicationName, Protected) VALUES ('baz', 'mycronjob', FALSE);
+```
+
+ApplicationName IS NULL means pg_stat_activity.application_name is ignored and only the Username must match.
+
 To run PgTerminator:
 ```
 $ PGUSER=pgterminator PGDATABASE=foobar ./pgterminator
@@ -108,14 +115,16 @@ Before PgTerminator calls pg_terminate_backend(),
 it will insert a row to terminator.Log:
 
 ```
-LogID            serial      NOT NULL,
-BlockingUsername text        NOT NULL,
-BlockingPID      integer     NOT NULL,
-BlockingQuery    text        NOT NULL,
-WaitingUsername  text        NOT NULL,
-WaitingPID       integer     NOT NULL,
-WaitingQuery     text        NOT NULL,
-Datestamp        timestamptz NOT NULL DEFAULT now(),
+LogID                   serial      NOT NULL,
+BlockingUsername        text        NOT NULL,
+BlockingApplicationName text        NULL,
+BlockingPID             integer     NOT NULL,
+BlockingQuery           text        NOT NULL,
+WaitingUsername         text        NOT NULL,
+WaitingApplicationName  text        NULL,
+WaitingPID              integer     NOT NULL,
+WaitingQuery            text        NOT NULL,
+Datestamp               timestamptz NOT NULL DEFAULT now(),
 PRIMARY KEY (LogID)
 ```
 

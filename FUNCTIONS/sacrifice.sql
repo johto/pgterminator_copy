@@ -25,13 +25,7 @@ INTO
 FROM pg_stat_activity_portable()
 WHERE pid = _WaitingPID
 AND waiting IS TRUE
-AND EXISTS (
-    SELECT 1
-    FROM terminator.Users
-    WHERE terminator.Users.Protected IS TRUE
-    AND  terminator.Users.Username        = pg_stat_activity_portable.usename
-    AND (terminator.Users.ApplicationName = pg_stat_activity_portable.application_name OR terminator.Users.ApplicationName IS NULL)
-);
+AND terminator.Is_Protected(usename, application_name) IS TRUE;
 IF NOT FOUND THEN
     -- Probably not waiting anymore
     RETURN TRUE;
@@ -47,13 +41,7 @@ INTO
     _BlockingQuery
 FROM pg_stat_activity_portable()
 WHERE pid = _BlockingPID
-AND EXISTS (
-    SELECT 1
-    FROM terminator.Users
-    WHERE terminator.Users.Protected IS FALSE
-    AND  terminator.Users.Username        = pg_stat_activity_portable.usename
-    AND (terminator.Users.ApplicationName = pg_stat_activity_portable.application_name OR terminator.Users.ApplicationName IS NULL)
-);
+AND terminator.Is_Protected(usename, application_name) IS FALSE;
 IF NOT FOUND THEN
     -- Query probably finished already
     RETURN TRUE;
