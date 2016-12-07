@@ -19,6 +19,7 @@ AND waiting IS TRUE;
 SELECT pid INTO UnprotectedOldestRunningPID
 FROM pg_stat_activity_portable()
 WHERE usename IN (SELECT Username FROM terminator.Users WHERE Protected IS FALSE)
+AND xact_start < clock_timestamp()-'5 seconds'::interval
 ORDER BY xact_start
 LIMIT 1;
 
